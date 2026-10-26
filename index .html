@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#f1f5f9; --card:#fff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --primary:#4f46e5; --soft:#eef2ff;
+          --shadow:0 10px 30px rgba(15,23,42,.08); }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0b1120; --card:#111a2e; --text:#e2e8f0; --muted:#94a3b8; --border:#24304a; --primary:#818cf8; --soft:#1b2442;
+            --shadow:0 10px 30px rgba(0,0,0,.4); }
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh;
+         display:flex; align-items:center; justify-content:center; padding:20px; }
+  .card { width:100%; max-width:400px; background:var(--card); border:1px solid var(--border); border-radius:24px;
+          box-shadow:var(--shadow); padding:28px; text-align:center; }
+  h1 { font-size:1.3rem; letter-spacing:-.02em; }
+  .tabs { display:grid; grid-template-columns:repeat(3,1fr); background:var(--soft); border-radius:12px; padding:4px; margin:18px 0; }
+  .tabs button { font:inherit; font-size:.85rem; font-weight:600; border:0; background:transparent; color:var(--muted);
+                 padding:9px 4px; border-radius:9px; cursor:pointer; transition:all .2s; }
+  .tabs button.active { background:var(--card); color:var(--text); box-shadow:0 1px 4px rgba(0,0,0,.12); }
+  .ring { position:relative; width:220px; height:220px; margin:10px auto 22px; }
+  svg { transform:rotate(-90deg); }
+  circle { fill:none; stroke-width:10; }
+  .track { stroke:var(--border); }
+  .prog { stroke:var(--primary); stroke-linecap:round; stroke-dasharray:565.49; transition:stroke-dashoffset .4s linear; }
+  .time { position:absolute; inset:0; display:grid; place-items:center; font-size:3rem; font-weight:700;
+          letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+  .btns { display:flex; gap:10px; justify-content:center; }
+  .btn { font:inherit; font-weight:600; padding:12px 26px; border-radius:12px; cursor:pointer; transition:all .2s;
+         border:1.5px solid var(--border); background:var(--card); color:var(--text); }
+  .btn:hover { border-color:var(--primary); }
+  .btn.primary { background:var(--primary); border-color:var(--primary); color:#fff; min-width:130px; }
+  .stat { margin-top:20px; font-size:.85rem; color:var(--muted); }
+  .hint { margin-top:6px; font-size:.75rem; color:var(--muted); }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>Focus Timer</h1>
+  <div class="tabs" id="tabs">
+    <button data-m="focus" class="active">Focus</button>
+    <button data-m="short">Short break</button>
+    <button data-m="long">Long break</button>
+  </div>
+  <div class="ring">
+    <svg width="220" height="220" viewBox="0 0 200 200">
+      <circle class="track" cx="100" cy="100" r="90"/>
+      <circle class="prog" id="prog" cx="100" cy="100" r="90"/>
+    </svg>
+    <div class="time" id="time" aria-live="off">25:00</div>
+  </div>
+  <div class="btns">
+    <button class="btn primary" id="start">Start</button>
+    <button class="btn" id="reset">Reset</button>
+  </div>
+  <p class="stat">Focus sessions today: <strong id="count">0</strong></p>
+  <p class="hint">Press Space to start or pause</p>
+</main>
+<script>
+(() => {
+  const MODES = { focus: 25, short: 5, long: 15 }, C = 565.49;
+  const $ = id => document.getElementById(id);
+  const todayKey = 'focus-' + new Date().toDateString();
+  let mode = 'focus', total = MODES.focus * 60, remaining = total, end = 0, timer = null;
+
+  const getCount = () => { try { return +localStorage.getItem(todayKey) || 0; } catch (e) { return 0; } };
+  const addCount = () => { try { localStorage.setItem(todayKey, getCount() + 1); } catch (e) {} };
+
+  function draw() {
+    const m = String(Math.floor(remaining / 60)).padStart(2, '0'), s = String(remaining % 60).padStart(2, '0');
+    $('time').textContent = `${m}:${s}`;
+    $('prog').style.strokeDashoffset = C * (1 - remaining / total);
+    document.title = timer ? `${m}:${s} · Focus Timer` : 'Focus Timer';
+    $('count').textContent = getCount();
+  }
+  function beep() {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)(), o = ac.createOscillator(), g = ac.createGain();
+      o.connect(g); g.connect(ac.destination); o.frequency.value = 880; g.gain.setValueAtTime(.2, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + 1); o.start(); o.stop(ac.currentTime + 1);
+    } catch (e) {}
+  }
+  function stop() { clearInterval(timer); timer = null; $('start').textContent = 'Start'; }
+  function tick() {
+    remaining = Math.max(0, Math.round((end - Date.now()) / 1000));
+    if (remaining === 0) { stop(); beep(); if (mode === 'focus') addCount(); }
+    draw();
+  }
+  function toggle() {
+    if (timer) { stop(); draw(); return; }
+    if (remaining === 0) remaining = total;
+    end = Date.now() + remaining * 1000;
+    timer = setInterval(tick, 250);
+    $('start').textContent = 'Pause';
+    tick();
+  }
+  function setMode(m) {
+    stop(); mode = m; total = remaining = MODES[m] * 60;
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.m === m));
+    draw();
+  }
+  $('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); });
+  $('start').addEventListener('click', toggle);
+  $('reset').addEventListener('click', () => setMode(mode));
+  document.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); toggle(); } });
+  draw();
+})();
+</script>
+</body>
+</html>
