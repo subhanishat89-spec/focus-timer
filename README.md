@@ -2,7 +2,6 @@
 
 A minimal Pomodoro timer built with vanilla HTML, CSS, and JavaScript. No frameworks and no dependencies.
 
-🔗 **Live Demo:** [subhanishat89-spec.github.io/focus-timer](https://subhanishat89-spec.github.io/focus-timer/)
 
 ## ✨ Features
 - 🎯 Focus (25 min), Short break (5 min), and Long break (15 min) modes
